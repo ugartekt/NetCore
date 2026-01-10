@@ -1,0 +1,76 @@
+﻿@using WebLottoActivo.Models.ViewModels
+@model List<DesplazamientoDiario>
+
+@{
+    ViewData["Title"] = "Index";
+    int columnasPorFila = 6;
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">
+        <i class="bi bi-clipboard2-check"></i> Historial Resultados Animalitos
+    </h2>
+
+    <form method="post" asp-action="HistorialResumenDiario" class="mb-3">
+        <div class="row g-2">
+            <div class="col-12 col-md-4">
+                <label for="fecha" class="form-label fw-bold">Seleccione la fecha:</label>
+                <input type="date" name="date" id="fecha" class="form-control" value="@ViewBag.FechaSeleccionada" />
+            </div>
+            <div class="col-12 col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">Buscar</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="row">
+        <!-- Tabla de Hoy -->
+        <div class="col-12">
+            <h5 class="text-center">Resultados</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover table-striped">
+                    <thead class="table-info">
+                        <tr>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < Model.Count; i += columnasPorFila)
+                        {
+                            <tr>
+                                @for (int j = i; j < i + columnasPorFila; j++)
+                                {
+                                    if (j < Model.Count)
+                                    {
+                                        var row = Model[j];
+                                        <td class="text-center align-middle">
+                                            <div class="d-flex flex-column align-items-center">
+                                                <img src="data:image/png;base64,@row.ImageB64"
+                                                     alt="Imagen"
+                                                     class="img-fluid"
+                                                     style="max-width:75px; max-height:75px;" />
+                                                <span class="mt-2 fw-bold text-wrap text-center">@row.Nombre</span>
+                                                <span class="fw-light text-muted">@row.Hora</span>
+                                                @if (@row.IsFlag)
+                                                {
+                                                    <span class="fw-bold text-danger">(@row.Desplazamiento)</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="fw-light text-muted">(@row.Desplazamiento)</span>
+                                                }
+                                            </div>
+                                        </td>
+                                    }
+                                    else
+                                    {
+                                        <td></td>
+                                    }
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

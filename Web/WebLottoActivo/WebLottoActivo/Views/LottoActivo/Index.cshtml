@@ -1,0 +1,53 @@
+﻿@model List<LottoActivoAnimal>
+@{
+    ViewData["Title"] = "Index";
+    int columnasPorFila = 12;
+    int total = Model.Count;
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">
+        <i class="bi bi-clipboard2-check"></i> Lotto Activo
+    </h2>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover table-striped">
+            <thead class="table-info">
+                <tr>
+                    @for (int i = 0; i < columnasPorFila; i++)
+                    {
+                        <th class="text-center">Lotto #</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < total; i += columnasPorFila)
+                {
+                    <tr>
+                        @for (int j = i; j < i + columnasPorFila; j++)
+                        {
+                            if (j < total)
+                            {
+                                var row = Model[j];
+                                <td class="text-center align-middle">
+                                    <div class="d-flex flex-column align-items-center">
+                                        <img src="data:image/png;base64,@row.image"
+                                             alt="Imagen"
+                                             class="img-fluid"
+                                             style="max-width:70px; max-height:70px;" />
+                                        <span class="mt-2 fw-bold text-wrap text-center">@row.nombre</span>
+                                        <span class="fw-light text-muted">@row.id</span>
+                                    </div>
+                                </td>
+                            }
+                            else
+                            {
+                                <td></td> <!-- Celda vacía si no hay más datos -->
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

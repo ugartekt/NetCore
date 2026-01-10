@@ -1,0 +1,27 @@
+﻿@using WebLottoActivo.Models.ViewModels
+@model List<DesplazamientoResumen>
+@{
+    ViewData["Title"] = "Index";
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4"><i class="bi bi-arrow-repeat"></i> Desplazamiento Seguido</h2>
+
+    <table class="table table-bordered table-hover table-striped">
+        <thead class="table-info">
+            <tr>
+                <th>Desplazamiento</th>
+                <th>Cantidad</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Model)
+            {
+                <tr>
+                    <td>@row.Desplazamiento</td>
+                    <td>@row.Cantidad</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

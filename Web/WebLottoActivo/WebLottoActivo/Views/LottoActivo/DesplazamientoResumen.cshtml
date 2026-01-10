@@ -1,0 +1,61 @@
+﻿@using WebLottoActivo.Models.ViewModels
+@model List<DesplazamientoResumen>
+@{
+    ViewData["Title"] = "Index";
+
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4"><i class="bi bi-arrow-repeat"></i> Desplazamiento Resumen</h2>
+    <form method="get" asp-action="DesplazamientoResumen" class="mb-3">
+        <div class="row align-items-center">
+            <div class="col-auto">
+                <label for="rangoDias" class="form-label fw-bold">Filtrar por rango:</label>
+            </div>
+            <div class="col-auto">
+                <select name="rangoDias" id="rangoDias" class="form-select" onchange="this.form.submit()">
+                    <option value="7" selected>Últimos 7 días</option>
+                    <option value="15">Últimos 15 días</option>
+                    <option value="0">Todas</option>
+                </select>
+            </div>
+        </div>
+    </form>
+
+    @* <table id="desplazamientoResumen"  class="table table-bordered table-hover table-striped"> *@
+    <table id="desplazamientoResumen" class="table table-sm table-bordered table-hover table-striped">
+        <thead class="table-info">
+            <tr>
+                <th>Desplazamiento</th>
+                <th>Desplazamiento Posterior</th>
+                <th>Cantidad</th>
+                <th>Ultima Fecha</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Model)
+            {
+                <tr>
+                    <td>@row.Desplazamiento</td>
+                    <td>@row.DesplazamientosPosteriores</td>
+                    <td>@row.Cantidad</td>
+                    <td>@row.Fecha</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('#desplazamientoResumen').DataTable({
+                pageLength: 25,
+                order: [[1, 'desc']],
+                language: {
+                    url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+                }
+            });
+        });
+    </script>
+}

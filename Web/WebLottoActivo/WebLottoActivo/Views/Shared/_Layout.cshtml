@@ -1,0 +1,82 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - WebLottoActivo</title>
+    <script type="importmap"></script>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/WebLottoActivo.styles.css" asp-append-version="true" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" />
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+            <div class="container-fluid">
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">WebLottoActivo</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+                        aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                    <ul class="navbar-nav flex-grow-1">
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-dark" href="#" id="menuDesplegable" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Tasa BCV
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="menuDesplegable">
+                                <li><a class="dropdown-item" asp-controller="TasaBCV" asp-action="Index">Tasa Actual</a></li>
+                                <li><a class="dropdown-item" asp-controller="TasaBCV" asp-action="IndexUSD">Historial USD</a></li>
+                                <li><a class="dropdown-item" asp-controller="TasaBCV" asp-action="IndexEUR">Historial EUR</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-dark" href="#" id="menuDesplegable" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Lotto Activo
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="menuDesplegable">
+                                <li><a class="dropdown-item" asp-controller="LottoActivo" asp-action="Index">Inicio</a></li>
+                                <li><a class="dropdown-item" asp-controller="LottoActivo" asp-action="ResumenDiario">Resumen Diario</a></li>
+                                <li><a class="dropdown-item" asp-controller="LottoActivo" asp-action="HistorialResumenDiario">Historial Resumen Diario</a></li>
+                                <li><a class="dropdown-item" asp-controller="LottoActivo" asp-action="DesplazamientoResumen">Desplazamiento Resumen</a></li>
+                                <li><a class="dropdown-item" asp-controller="LottoActivo" asp-action="DesplazamientoSeguido">Desplazamiento Seguido</a></li>
+                                <li><a class="dropdown-item" asp-controller="LottoActivo" asp-action="TotalHistorialAnimalito">Total Historial Animalito</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" asp-controller="LottoActivo" asp-action="Exclusiones">Exclusiones</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                   
+                </div>
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="border-top footer text-muted">
+        <div class="container">
+            &copy; 2025 - WebLottoActivo - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+        </div>
+    </footer>
+    @* <script src="~/lib/jquery/dist/jquery.min.js"></script> *@
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
