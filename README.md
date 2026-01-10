@@ -1,2 +1,2 @@
-# BackgroundService
-Servicios de Windows en NetCore
+# NetCore
+Todo tipo de proyecto bajo NetCore
