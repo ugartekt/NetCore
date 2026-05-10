@@ -8,7 +8,7 @@
     int columnasPorFila = 3;
 }
 
-<div class="container mt-4">
+<div class="container mt-4 page-bottom-padding">
     <h2 class="mb-4">
         <i class="bi bi-clipboard2-check"></i> Resumen Diario
     </h2>
@@ -26,6 +26,33 @@
     </form>
     <hr style="border: 1px solid #ccc; margin: 20px 0;" />
     <div class="row">
+        <!-- Repeated animals container -->
+        <div class="col-12 mb-3">
+            <div class="card">
+                <div class="card-body d-flex flex-wrap align-items-center">
+                    <h6 class="me-3 mb-0">Animales repetidos entre las dos fechas:</h6>
+                    @if (Model.Repeated != null && Model.Repeated.Any())
+                    {
+                        foreach (var item in Model.Repeated)
+                        {
+                            var cnt = Model.RepeatedCounts != null && Model.RepeatedCounts.ContainsKey(item.LottoActivoAnimalId) ? Model.RepeatedCounts[item.LottoActivoAnimalId] : 1;
+                            <div class="position-relative d-flex flex-column align-items-center me-3 text-center">
+                                <img src="data:image/png;base64,@item.ImageB64" style="max-width:48px; max-height:48px;" class="rounded" title="@item.Nombre" />
+                                @if (cnt > 1)
+                                {
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">@cnt</span>
+                                }
+                                <small class="d-block">@item.Nombre</small>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <span class="text-muted">No hay animales repetidos entre las fechas seleccionadas.</span>
+                    }
+                </div>
+            </div>
+        </div>
         <!-- Tabla de Hoy -->
         <div class="col-12 col-lg-6">
             <h5 class="text-center">@ViewBag.Yesterday</h5>

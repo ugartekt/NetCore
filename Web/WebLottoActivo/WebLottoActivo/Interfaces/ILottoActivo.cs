@@ -12,11 +12,14 @@ namespace WebLottoActivo.Interfaces
     {
         public Task<bool> InsertResultadoAsync(LottoActivoResultado lottoActivoResultado);
         public Task<LottoActivoResultado> UltimoAnimalitoDesplazamientoAsync();
-        public Task<List<DesplazamientoResumen>> ListCantidadDesplazamientoAsync();
+        public Task<List<DesplazamientoResumen>> ListCantidadDesplazamientoAsync(int? year = null, int? month = null);
+        public Task<List<Models.ViewModels.AnimalitoResumen>> ListCantidadAnimalitoAsync(int? year = null, int? month = null);
         public Task<List<DesplazamientoDiario>> ListDesplazamientoDiarioAsync(string date);
         public Task<List<LottoActivoAnimal>> ListLottoAnimal();
         public Task<List<DesplazamientoResumen>> ListDesplazamientoSeguidoAsync();
-        public Task<List<CantidadTotalAnimalitos>> TotalHistorialAnimalito();
+        public Task<List<CantidadTotalAnimalitos>> TotalHistorialAnimalito(int? year = null, int? month = null);
+        public Task<(int minYear, int maxYear)> GetAvailableYearRangeAsync();
+        public Task<List<Models.ViewModels.SeguimientoHorarioCandidate>> SeguimientoHorarioAsync(int hour, int topN = 5, int? year = null, int? month = null);
 
     }
 }

@@ -1,0 +1,92 @@
+@using WebLottoActivo.Models.ViewModels
+@model List<SeguimientoHorarioCandidate>
+@{
+    ViewData["Title"] = "Seguimiento Horario";
+    int selectedHour = ViewBag.SelectedHour ?? 19;
+    int selectedTop = ViewBag.SelectedTop ?? 5;
+    int minYear = ViewBag.MinYear ?? DateTime.Today.Year - 2;
+    int maxYear = ViewBag.MaxYear ?? DateTime.Today.Year;
+    int selectedYear = ViewBag.SelectedYear ?? DateTime.Today.Year;
+    int selectedMonth = ViewBag.SelectedMonth ?? DateTime.Today.Month;
+}
+
+<div class="container mt-4 page-bottom-padding">
+    <h2 class="mb-4"><i class="bi bi-graph-up"></i> Seguimiento Horario</h2>
+
+    <form method="get" asp-action="SeguimientoHorario" class="mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label fw-bold">Hora (24h):</label>
+                <input type="number" name="hour" class="form-control" min="0" max="23" value="@selectedHour" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label fw-bold">Top N:</label>
+                <input type="number" name="topN" class="form-control" min="1" max="20" value="@selectedTop" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label fw-bold">Mes:</label>
+                <select name="month" class="form-select">
+                    <option value="0">Todas</option>
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        if (m == selectedMonth)
+                        {
+                            <option value="@m" selected>@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</option>
+                        }
+                        else
+                        {
+                            <option value="@m">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label fw-bold">Año:</label>
+                <select name="year" class="form-select">
+                    <option value="0">Todos</option>
+                    @for (int y = minYear; y <= maxYear; y++)
+                    {
+                        if (y == selectedYear)
+                        {
+                            <option value="@y" selected>@y</option>
+                        }
+                        else
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary">Calcular</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5>Candidatos</h5>
+                    <div class="d-flex gap-3 flex-wrap">
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var c in Model)
+                            {
+                                <div class="text-center">
+                                    <img src="data:image/png;base64,@c.ImageB64" class="rounded" style="max-width:64px; max-height:64px;" alt="@c.Nombre" />
+                                    <div>@c.Nombre</div>
+                                    <div class="text-muted">Score: @String.Format("{0:0.00}", c.Score)</div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <span class="text-muted">No hay candidatos para los filtros seleccionados.</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

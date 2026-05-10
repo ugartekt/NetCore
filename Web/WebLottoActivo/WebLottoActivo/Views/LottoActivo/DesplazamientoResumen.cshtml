@@ -5,25 +5,61 @@
 
 }
 
-<div class="container mt-4">
+<div class="container mt-4 page-bottom-padding">
     <h2 class="mb-4"><i class="bi bi-arrow-repeat"></i> Desplazamiento Resumen</h2>
+    <!-- selector (use the form below) -->
+    <!-- month/year selector (single) -->
     <form method="get" asp-action="DesplazamientoResumen" class="mb-3">
-        <div class="row align-items-center">
+        <div class="row align-items-center g-2">
             <div class="col-auto">
-                <label for="rangoDias" class="form-label fw-bold">Filtrar por rango:</label>
+                <label for="monthSelect" class="form-label fw-bold">Mes:</label>
             </div>
             <div class="col-auto">
-                <select name="rangoDias" id="rangoDias" class="form-select" onchange="this.form.submit()">
-                    <option value="7" selected>Últimos 7 días</option>
-                    <option value="15">Últimos 15 días</option>
+                <select name="month" id="monthSelect" class="form-select" onchange="this.form.submit()">
+                    @{ 
+                        int selectedMonth = ViewBag.SelectedMonth != null ? (int)ViewBag.SelectedMonth : DateTime.Today.Month; 
+                        int minYear = ViewBag.MinYear != null ? (int)ViewBag.MinYear : DateTime.Today.Year - 2;
+                        int maxYear = ViewBag.MaxYear != null ? (int)ViewBag.MaxYear : DateTime.Today.Year;
+                    }
                     <option value="0">Todas</option>
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        if (m == selectedMonth)
+                        {
+                            <option value="@m" selected>@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</option>
+                        }
+                        else
+                        {
+                            <option value="@m">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</option>
+                        }
+                    }
+                </select>
+            </div>
+            <div class="col-auto">
+                <label for="yearSelect" class="form-label fw-bold">Año:</label>
+            </div>
+            <div class="col-auto">
+                <select name="year" id="yearSelect" class="form-select" onchange="this.form.submit()">
+                    <option value="0">Todas</option>
+                    @for (int y = minYear; y <= maxYear; y++)
+                    {
+                        if (y == ViewBag.SelectedYear)
+                        {
+                            <option value="@y" selected>@y</option>
+                        }
+                        else
+                        {
+                            <option value="@y">@y</option>
+                        }
+                    }
                 </select>
             </div>
         </div>
     </form>
 
     @* <table id="desplazamientoResumen"  class="table table-bordered table-hover table-striped"> *@
-    <table id="desplazamientoResumen" class="table table-sm table-bordered table-hover table-striped">
+    <div class="table-responsive">
+        <table id="desplazamientoResumen" class="table table-sm table-bordered table-hover table-striped">
         <thead class="table-info">
             <tr>
                 <th>Desplazamiento</th>
@@ -43,7 +79,8 @@
                 </tr>
             }
         </tbody>
-    </table>
+        </table>
+    </div>
 </div>
 
 @section Scripts {
