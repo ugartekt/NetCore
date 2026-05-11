@@ -90,35 +90,43 @@ namespace WebLottoActivo.Controllers
             var today = await _lottoActivo.ListDesplazamientoDiarioAsync(date);
             var yesterday = await _lottoActivo.ListDesplazamientoDiarioAsync(dateYesterday);
 
-            // Compare by LottoActivoAnimalId instead of desplazamiento to detect repeated animals
-            var comunes = today.Select(x => x.LottoActivoAnimalId)
-                               .Intersect(yesterday.Select(y => y.LottoActivoAnimalId))
-                               .ToHashSet();
+            // Consider repeats by LottoActivoAnimalId only for the "Animales repetidos" card.
+            var comunesByAnimal = today.Select(x => x.LottoActivoAnimalId)
+                                       .Intersect(yesterday.Select(y => y.LottoActivoAnimalId))
+                                       .ToHashSet();
 
+            // mark flags in the tables when animal id repeats
             foreach (var item in today)
-                item.IsFlag = comunes.Contains(item.LottoActivoAnimalId);
+                item.IsFlag = comunesByAnimal.Contains(item.LottoActivoAnimalId);
 
             foreach (var item in yesterday)
-                item.IsFlag = comunes.Contains(item.LottoActivoAnimalId);
+                item.IsFlag = comunesByAnimal.Contains(item.LottoActivoAnimalId);
 
-            // Build a deterministic list of repeated animals (prefer a record from 'today' when available)
-            var repeated = new List<DesplazamientoDiario>();
-            var repeatedCounts = new Dictionary<int,int>();
-            // Preserve first-seen order: take ids in the order they appear in 'today' then 'yesterday'
-            var repeatedIds = today.Concat(yesterday)
-                                    .Select(x => x.LottoActivoAnimalId)
-                                    .Where(id => comunes.Contains(id))
-                                    .Distinct()
-                                    .ToList();
-            foreach (var id in repeatedIds)
+            // Helper to parse hora in several formats (HH:mm, hh:mmAM/PM, etc.)
+            TimeSpan ParseHora(string hora)
             {
-                var item = today.FirstOrDefault(t => t.LottoActivoAnimalId == id) ?? yesterday.FirstOrDefault(t => t.LottoActivoAnimalId == id);
-                if (item != null)
-                    repeated.Add(item);
-                // count occurrences across both lists
-                int count = today.Count(t => t.LottoActivoAnimalId == id) + yesterday.Count(t => t.LottoActivoAnimalId == id);
-                repeatedCounts[id] = count;
+                if (string.IsNullOrEmpty(hora)) return TimeSpan.Zero;
+                if (DateTime.TryParse(hora, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AllowWhiteSpaces, out var dt)) return dt.TimeOfDay;
+                if (TimeSpan.TryParse(hora, out var ts)) return ts;
+                var parts = hora.Split(':');
+                if (parts.Length >= 2 && int.TryParse(parts[0], out int ph) && int.TryParse(parts[1], out int pm)) return new TimeSpan(ph, pm, 0);
+                return TimeSpan.Zero;
             }
+
+            // Build list of repeated animals ordered by earliest hora across both days
+            var combined = today.Concat(yesterday)
+                                .Where(x => comunesByAnimal.Contains(x.LottoActivoAnimalId))
+                                .Select(x => new { Item = x, Time = ParseHora(x.Hora) })
+                                .OrderBy(x => x.Time)
+                                .ThenBy(x => x.Item.LottoActivoAnimalId)
+                                .ToList();
+
+            var repeated = combined.GroupBy(x => x.Item.LottoActivoAnimalId)
+                                   .Select(g => g.First().Item)
+                                   .ToList();
+
+            var repeatedCounts = repeated.ToDictionary(r => r.LottoActivoAnimalId,
+                r => today.Count(t => t.LottoActivoAnimalId == r.LottoActivoAnimalId) + yesterday.Count(t => t.LottoActivoAnimalId == r.LottoActivoAnimalId));
 
             var viewModel = new ResumenDiario
             {
@@ -131,12 +139,6 @@ namespace WebLottoActivo.Controllers
             return View(viewModel);
         }
 
-        //[HttpGet]
-        //public async Task<IActionResult> SeguimientoHorario(int hour = 19, int topN = 5, int? year = null, int? month = null)
-        //{
-        //    var preds = await _lottoActivo.SeguimientoHorarioAsync(hour, topN, year, month);
-        //    return Json(preds);
-        //}
 
         //View to display seguimiento horario candidates and controls
         [HttpGet]
