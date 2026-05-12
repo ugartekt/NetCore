@@ -95,12 +95,18 @@ namespace WebLottoActivo.Controllers
                                        .Intersect(yesterday.Select(y => y.LottoActivoAnimalId))
                                        .ToHashSet();
 
+            var comunes = today.Select(x => x.Desplazamiento)
+                                           .Intersect(yesterday.Select(y => y.Desplazamiento))
+                                           .ToHashSet();
+
             // mark flags in the tables when animal id repeats
             foreach (var item in today)
-                item.IsFlag = comunesByAnimal.Contains(item.LottoActivoAnimalId);
+                item.IsFlag = comunes.Contains(item.Desplazamiento);
 
             foreach (var item in yesterday)
-                item.IsFlag = comunesByAnimal.Contains(item.LottoActivoAnimalId);
+                item.IsFlag = comunes.Contains(item.Desplazamiento);
+
+
 
             // Helper to parse hora in several formats (HH:mm, hh:mmAM/PM, etc.)
             TimeSpan ParseHora(string hora)
