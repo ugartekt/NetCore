@@ -474,6 +474,13 @@ namespace WebLottoActivo.Service
                     Score = 1
                 }).ToList();
 
+                // set desplazamiento for each item (use the actual record's desplazamiento)
+                for (int i = 0; i < top.Count; i++)
+                {
+                    var rec = freqAtHour[i];
+                    top[i].Desplazamiento = rec.desplazamiento;
+                }
+
                 return top;
             }
             catch
