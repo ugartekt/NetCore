@@ -119,13 +119,14 @@ namespace WebLottoActivo.Controllers
                 return TimeSpan.Zero;
             }
 
-            // Build list of repeated animals ordered by earliest hora across both days
-            var combined = today.Concat(yesterday)
-                                .Where(x => comunesByAnimal.Contains(x.LottoActivoAnimalId))
-                                .Select(x => new { Item = x, Time = ParseHora(x.Hora) })
-                                .OrderBy(x => x.Time)
-                                .ThenBy(x => x.Item.LottoActivoAnimalId)
-                                .ToList();
+            // Build list of repeated animals ordered by date (yesterday first) then by hora
+            var combined = yesterday.Select(x => new { Item = x, Day = 0, Time = ParseHora(x.Hora) })
+                                    .Concat(today.Select(x => new { Item = x, Day = 1, Time = ParseHora(x.Hora) }))
+                                    .Where(x => comunesByAnimal.Contains(x.Item.LottoActivoAnimalId))
+                                    .OrderByDescending(x => x.Day)
+                                    .ThenBy(x => x.Time)
+                                    .ThenBy(x => x.Item.LottoActivoAnimalId)
+                                    .ToList();
 
             var repeated = combined.GroupBy(x => x.Item.LottoActivoAnimalId)
                                    .Select(g => g.First().Item)
@@ -148,25 +149,23 @@ namespace WebLottoActivo.Controllers
 
         //View to display seguimiento horario candidates and controls
         [HttpGet]
-        public async Task<IActionResult> SeguimientoHorario(int? hour, int? topN, int? year, int? month)
+        public async Task<IActionResult> SeguimientoHorario(int? hour, int? year, int? month)
         {
             var today = DateTime.Today;
-            int selHour = hour ?? 19;
-            int selTop = topN ?? 5;
+            int selHour = hour ?? 8;
 
             // prepare year/month defaults
-            int displayYear = year ?? today.Year;
-            int displayMonth = month ?? today.Month;
+            year = year ?? today.Year;
+            month = month ?? today.Month;
 
             var range = await _lottoActivo.GetAvailableYearRangeAsync();
             ViewBag.MinYear = range.minYear;
             ViewBag.MaxYear = range.maxYear;
-            ViewBag.SelectedYear = displayYear;
-            ViewBag.SelectedMonth = displayMonth;
+            ViewBag.SelectedYear = year;
+            ViewBag.SelectedMonth = month;
             ViewBag.SelectedHour = selHour;
-            ViewBag.SelectedTop = selTop;
 
-            var preds = await _lottoActivo.SeguimientoHorarioAsync(selHour, selTop, year, month);
+            var preds = await _lottoActivo.SeguimientoHorarioAsync(selHour, year, month);
             return View("SeguimientoHorario", preds);
         }
 

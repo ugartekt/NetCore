@@ -19,7 +19,7 @@ namespace WebLottoActivo.Interfaces
         public Task<List<DesplazamientoResumen>> ListDesplazamientoSeguidoAsync();
         public Task<List<CantidadTotalAnimalitos>> TotalHistorialAnimalito(int? year = null, int? month = null);
         public Task<(int minYear, int maxYear)> GetAvailableYearRangeAsync();
-        public Task<List<Models.ViewModels.SeguimientoHorarioCandidate>> SeguimientoHorarioAsync(int hour, int topN = 5, int? year = null, int? month = null);
+        public Task<List<Models.ViewModels.SeguimientoHorarioCandidate>> SeguimientoHorarioAsync(int hour, int? year = null, int? month = null);
 
     }
 }

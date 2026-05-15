@@ -406,7 +406,7 @@ namespace WebLottoActivo.Service
             }
         }
 
-        public async Task<List<Models.ViewModels.SeguimientoHorarioCandidate>> SeguimientoHorarioAsync(int hour, int topN = 5, int? year = null, int? month = null)
+        public async Task<List<Models.ViewModels.SeguimientoHorarioCandidate>> SeguimientoHorarioAsync(int hour,int? year = null, int? month = null)
         {
             try
             {
@@ -430,9 +430,9 @@ namespace WebLottoActivo.Service
                 // frequency at the requested hour (parse hora safely)
                 var freqAtHour = all
                     .Where(r => ParseTimeSafe(r.hora).Hours == hour)
-                    .GroupBy(r => r.lottoActivoAnimalId)
-                    .Select(g => new { AnimalId = g.Key, Count = g.Count() })
-                    .OrderByDescending(x => x.Count)
+                    //.GroupBy(r => r.lottoActivoAnimalId)
+                    //.Select(g => new { AnimalId = g.Key, Count = g.Count() })
+                    .OrderByDescending(x => x.hora)
                     .ToList();
 
                 // previous hour
@@ -459,19 +459,19 @@ namespace WebLottoActivo.Service
                 var candidates = new Dictionary<int, double>();
                 foreach (var f in freqAtHour)
                 {
-                    candidates[f.AnimalId] = f.Count;
+                    //candidates[f.AnimalId] = f.Count;
                 }
                 foreach (var t in nextCounts)
                 {
                     candidates[t.Key] = candidates.GetValueOrDefault(t.Key, 0) + t.Value * 0.5; // weight transitions
                 }
 
-                var top = candidates.OrderByDescending(kv => kv.Value).Take(topN).Select(kv => new Models.ViewModels.SeguimientoHorarioCandidate
+                var top = freqAtHour.Select(kv => new Models.ViewModels.SeguimientoHorarioCandidate
                 {
-                    AnimalId = kv.Key,
-                    Nombre = db.lottoActivoAnimals.Where(a => a.id == kv.Key).Select(a => a.nombre).FirstOrDefault(),
-                    ImageB64 = db.lottoActivoAnimals.Where(a => a.id == kv.Key).Select(a => a.image).FirstOrDefault(),
-                    Score = kv.Value
+                    AnimalId = kv.lottoActivoAnimalId,
+                    Nombre = db.lottoActivoAnimals.Where(a => a.id == kv.lottoActivoAnimalId).Select(a => a.nombre).FirstOrDefault(),
+                    ImageB64 = db.lottoActivoAnimals.Where(a => a.id == kv.lottoActivoAnimalId).Select(a => a.image).FirstOrDefault(),
+                    Score = 1
                 }).ToList();
 
                 return top;

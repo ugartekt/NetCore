@@ -2,8 +2,7 @@
 @model List<SeguimientoHorarioCandidate>
 @{
     ViewData["Title"] = "Seguimiento Horario";
-    int selectedHour = ViewBag.SelectedHour ?? 19;
-    int selectedTop = ViewBag.SelectedTop ?? 5;
+    int selectedHour = ViewBag.SelectedHour ?? 8;
     int minYear = ViewBag.MinYear ?? DateTime.Today.Year - 2;
     int maxYear = ViewBag.MaxYear ?? DateTime.Today.Year;
     int selectedYear = ViewBag.SelectedYear ?? DateTime.Today.Year;
@@ -17,11 +16,7 @@
         <div class="row g-2 align-items-end">
             <div class="col-auto">
                 <label class="form-label fw-bold">Hora (24h):</label>
-                <input type="number" name="hour" class="form-control" min="0" max="23" value="@selectedHour" />
-            </div>
-            <div class="col-auto">
-                <label class="form-label fw-bold">Top N:</label>
-                <input type="number" name="topN" class="form-control" min="1" max="20" value="@selectedTop" />
+                <input type="number" name="hour" class="form-control" min="8" max="19" value="@selectedHour" />
             </div>
             <div class="col-auto">
                 <label class="form-label fw-bold">Mes:</label>
