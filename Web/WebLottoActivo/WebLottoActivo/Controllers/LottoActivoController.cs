@@ -15,6 +15,28 @@ namespace WebLottoActivo.Controllers
         {
             _lottoActivo = lottoActivo;
         }
+        [HttpGet]
+        public async Task<IActionResult> Occurrences(int animalId, int? year, int? month)
+        {
+            // default to selected month/year if not provided
+            var today = DateTime.Today;
+            int useYear = year ?? today.Year;
+            int useMonth = month ?? today.Month;
+
+            var rows = await _lottoActivo.GetOccurrencesAsync(animalId, useYear, useMonth);
+            return Json(rows);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> OccurrencesByDesplazamiento(int desplazamiento, int? year, int? month)
+        {
+            var today = DateTime.Today;
+            int useYear = year ?? today.Year;
+            int useMonth = month ?? today.Month;
+
+            var rows = await _lottoActivo.GetOccurrencesByDesplazamientoAsync(desplazamiento, useYear, useMonth);
+            return Json(rows);
+        }
         public async Task<IActionResult> Index()
         {
             List<LottoActivoAnimal> listLottoActivoAnimal = await _lottoActivo.ListLottoAnimal();
@@ -64,6 +86,12 @@ namespace WebLottoActivo.Controllers
             int selectedMonth = month ?? today.Month;
 
             var result = await _lottoActivo.ListCantidadAnimalitoAsync(selectedYear, selectedMonth);
+
+            // also get total occurrences per animal for the selected month to show in the UI
+            var totals = await _lottoActivo.TotalHistorialAnimalito(selectedYear, selectedMonth);
+            var countByAnimal = totals.ToDictionary(t => t.Id, t => t.Cantidad);
+            ViewBag.CountByAnimal = countByAnimal;
+
             ViewBag.SelectedYear = selectedYear;
             ViewBag.SelectedMonth = selectedMonth;
             return View(result);

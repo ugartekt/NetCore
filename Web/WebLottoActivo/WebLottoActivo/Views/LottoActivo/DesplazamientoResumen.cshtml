@@ -62,6 +62,7 @@
         <table id="desplazamientoResumen" class="table table-sm table-bordered table-hover table-striped">
         <thead class="table-info">
             <tr>
+                <th>Detalles</th>
                 <th>Desplazamiento</th>
                 <th>Desplazamiento Posterior</th>
                 <th>Cantidad</th>
@@ -72,6 +73,12 @@
             @foreach (var row in Model)
             {
                 <tr>
+                    <td class="text-center align-middle">
+                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#occDesplModal" data-desplazamiento="@row.Desplazamiento" title="Ver historial">
+                            <i class="bi bi-clock-history"></i>
+                        </button>
+                        <div class="small text-muted mt-1">@row.Cantidad veces</div>
+                    </td>
                     <td>@row.Desplazamiento</td>
                     <td>@row.DesplazamientosPosteriores</td>
                     <td>@row.Cantidad</td>
@@ -83,6 +90,29 @@
     </div>
 </div>
 
+<!-- Modal para desplazamiento -->
+<div class="modal fade" id="occDesplModal" tabindex="-1" aria-labelledby="occDesplModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="occDesplModalLabel">Historial por Desplazamiento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="occDesplContent">
+          <table id="occDesplTable" class="table table-sm table-striped">
+            <thead><tr><th>Fecha</th><th>Hora</th><th>Desplazamiento</th><th>Días</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 @section Scripts {
     <script>
         $(document).ready(function () {
@@ -92,6 +122,27 @@
                 language: {
                     url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
                 }
+            });
+
+            var occDesplTable = $('#occDesplTable').DataTable({
+                paging: true,
+                pageLength: 10,
+                ordering: false,
+                searching: false,
+                info: false
+            });
+
+            $('#occDesplModal').on('show.bs.modal', function (event) {
+                var button = $(event.relatedTarget);
+                var desplazamiento = button.data('desplazamiento');
+                var year = $('#yearSelect').val();
+                var month = $('#monthSelect').val();
+                occDesplTable.clear().draw();
+                $.getJSON('/LottoActivo/OccurrencesByDesplazamiento', { desplazamiento: desplazamiento, year: year, month: month }, function (data) {
+                    data.forEach(function (r) {
+                        occDesplTable.row.add([r.fecha, r.hora, r.desplazamiento, r.dias]).draw(false);
+                    });
+                });
             });
         });
     </script>

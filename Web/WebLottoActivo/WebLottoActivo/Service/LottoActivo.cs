@@ -489,6 +489,100 @@ namespace WebLottoActivo.Service
             }
         }
 
+        public async Task<List<Models.ViewModels.Occurrence>> GetOccurrencesAsync(int animalId, int? year = null, int? month = null)
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                var query = db.lottoActivoResultados.AsNoTracking().Where(r => r.lottoActivoAnimalId == animalId).AsQueryable();
+                if (year.HasValue && month.HasValue)
+                {
+                    var prefix = year.Value + "-" + month.Value.ToString("D2") + "-";
+                    query = query.Where(r => r.fecha.StartsWith(prefix));
+                }
+
+                var rows = await query.OrderByDescending(r => r.fecha).ThenByDescending(r => r.hora)
+                                      .Select(r => new Models.ViewModels.Occurrence { Fecha = r.fecha, Hora = r.hora, Desplazamiento = r.desplazamiento, Dias = 0 })
+                                      .ToListAsync();
+
+                // compute Dias on the descending-ordered list: for each row, Dias = curr.Date - nextOlder.Date
+                // rows are ordered descending by fecha,hora (newest first)
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    if (i == rows.Count - 1)
+                    {
+                        // oldest record, no older to compare
+                        rows[i].Dias = 0;
+                        continue;
+                    }
+                    DateTime? curr = DateTime.TryParse(rows[i].Fecha, out var cd) ? cd : (DateTime?)null;
+                    DateTime? nextOlder = DateTime.TryParse(rows[i + 1].Fecha, out var nd) ? nd : (DateTime?)null;
+                    if (curr.HasValue && nextOlder.HasValue)
+                    {
+                        rows[i].Dias = (curr.Value.Date - nextOlder.Value.Date).Days;
+                    }
+                    else
+                    {
+                        rows[i].Dias = 0;
+                    }
+                }
+
+                return rows;
+            }
+            catch
+            {
+                return new List<Models.ViewModels.Occurrence>();
+            }
+        }
+
+        public async Task<List<Models.ViewModels.Occurrence>> GetOccurrencesByDesplazamientoAsync(int desplazamiento, int? year = null, int? month = null)
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                var query = db.lottoActivoResultados.AsNoTracking().Where(r => r.desplazamiento == desplazamiento).AsQueryable();
+                if (year.HasValue && month.HasValue)
+                {
+                    var prefix = year.Value + "-" + month.Value.ToString("D2") + "-";
+                    query = query.Where(r => r.fecha.StartsWith(prefix));
+                }
+
+                var rows = await query.OrderByDescending(r => r.fecha).ThenByDescending(r => r.hora)
+                                      .Select(r => new Models.ViewModels.Occurrence { Fecha = r.fecha, Hora = r.hora, Desplazamiento = r.desplazamiento, Dias = 0 })
+                                      .ToListAsync();
+
+                // compute Dias on descending list
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    if (i == rows.Count - 1)
+                    {
+                        rows[i].Dias = 0;
+                        continue;
+                    }
+                    DateTime? curr = DateTime.TryParse(rows[i].Fecha, out var cd) ? cd : (DateTime?)null;
+                    DateTime? nextOlder = DateTime.TryParse(rows[i + 1].Fecha, out var nd) ? nd : (DateTime?)null;
+                    if (curr.HasValue && nextOlder.HasValue)
+                    {
+                        rows[i].Dias = (curr.Value.Date - nextOlder.Value.Date).Days;
+                    }
+                    else
+                    {
+                        rows[i].Dias = 0;
+                    }
+                }
+
+                return rows;
+            }
+            catch
+            {
+                return new List<Models.ViewModels.Occurrence>();
+            }
+        }
+
 
 
     }
