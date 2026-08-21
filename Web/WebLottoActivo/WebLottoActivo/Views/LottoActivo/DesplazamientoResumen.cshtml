@@ -101,7 +101,7 @@
       <div class="modal-body">
         <div id="occDesplContent">
           <table id="occDesplTable" class="table table-sm table-striped">
-            <thead><tr><th>Fecha</th><th>Hora</th><th>Desplazamiento</th><th>Días</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Hora</th><th>Animalito</th><th>Desplazamiento</th><th>Animalito</th><th>Días</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -140,7 +140,13 @@
                 occDesplTable.clear().draw();
                 $.getJSON('/LottoActivo/OccurrencesByDesplazamiento', { desplazamiento: desplazamiento, year: year, month: month }, function (data) {
                     data.forEach(function (r) {
-                        occDesplTable.row.add([r.fecha, r.hora, r.desplazamiento, r.dias]).draw(false);
+                        var imgHtml = r.animalImageB64
+                            ? '<img src="data:image/png;base64,' + r.animalImageB64 + '" title="' + (r.animalNombre || '') + '" style="max-width:32px; max-height:32px;" class="rounded" />'
+                            : '';
+                        var imgPosteriorHtml = r.animalPosteriorImageB64
+                            ? '<img src="data:image/png;base64,' + r.animalPosteriorImageB64 + '" title="' + (r.animalPosteriorNombre || '') + '" style="max-width:32px; max-height:32px;" class="rounded" />'
+                            : '';
+                        occDesplTable.row.add([r.fecha, r.hora, imgHtml, r.desplazamientoPosterior, imgPosteriorHtml, r.dias]).draw(false);
                     });
                 });
             });

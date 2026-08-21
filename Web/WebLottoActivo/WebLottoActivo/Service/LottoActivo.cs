@@ -504,7 +504,16 @@ namespace WebLottoActivo.Service
                 }
 
                 var rows = await query.OrderByDescending(r => r.fecha).ThenByDescending(r => r.hora)
-                                      .Select(r => new Models.ViewModels.Occurrence { Fecha = r.fecha, Hora = r.hora, Desplazamiento = r.desplazamiento, Dias = 0 })
+                                      .Select(r => new Models.ViewModels.Occurrence
+                                      {
+                                          Id = r.id,
+                                          Fecha = r.fecha,
+                                          Hora = r.hora,
+                                          Desplazamiento = r.desplazamiento,
+                                          Dias = 0,
+                                          AnimalNombre = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.nombre : null,
+                                          AnimalImageB64 = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.image : null
+                                      })
                                       .ToListAsync();
 
                 // compute Dias on the descending-ordered list: for each row, Dias = curr.Date - nextOlder.Date
@@ -526,6 +535,41 @@ namespace WebLottoActivo.Service
                     else
                     {
                         rows[i].Dias = 0;
+                    }
+                }
+
+                // Animalito Posterior: el animal (y desplazamiento) que salio cronologicamente
+                // despues de cada ocurrencia de este animal.
+                if (rows.Count > 0)
+                {
+                    var secuencia = await db.lottoActivoResultados.AsNoTracking()
+                                            .OrderBy(r => r.id)
+                                            .Select(r => new
+                                            {
+                                                r.id,
+                                                r.desplazamiento,
+                                                AnimalNombre = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.nombre : null,
+                                                AnimalImageB64 = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.image : null
+                                            })
+                                            .ToListAsync();
+
+                    var siguientePorId = new Dictionary<int, (int? Desplazamiento, string AnimalNombre, string AnimalImageB64)>();
+                    for (int i = 0; i < secuencia.Count; i++)
+                    {
+                        var siguienteInfo = (i + 1 < secuencia.Count)
+                            ? (secuencia[i + 1].desplazamiento, secuencia[i + 1].AnimalNombre, secuencia[i + 1].AnimalImageB64)
+                            : ((int?)null, (string)null, (string)null);
+                        siguientePorId[secuencia[i].id] = siguienteInfo;
+                    }
+
+                    foreach (var row in rows)
+                    {
+                        if (siguientePorId.TryGetValue(row.Id, out var siguiente))
+                        {
+                            row.DesplazamientoPosterior = siguiente.Desplazamiento;
+                            row.AnimalPosteriorNombre = siguiente.AnimalNombre;
+                            row.AnimalPosteriorImageB64 = siguiente.AnimalImageB64;
+                        }
                     }
                 }
 
@@ -552,7 +596,16 @@ namespace WebLottoActivo.Service
                 }
 
                 var rows = await query.OrderByDescending(r => r.fecha).ThenByDescending(r => r.hora)
-                                      .Select(r => new Models.ViewModels.Occurrence { Fecha = r.fecha, Hora = r.hora, Desplazamiento = r.desplazamiento, Dias = 0 })
+                                      .Select(r => new Models.ViewModels.Occurrence
+                                      {
+                                          Id = r.id,
+                                          Fecha = r.fecha,
+                                          Hora = r.hora,
+                                          Desplazamiento = r.desplazamiento,
+                                          Dias = 0,
+                                          AnimalNombre = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.nombre : null,
+                                          AnimalImageB64 = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.image : null
+                                      })
                                       .ToListAsync();
 
                 // compute Dias on descending list
@@ -572,6 +625,41 @@ namespace WebLottoActivo.Service
                     else
                     {
                         rows[i].Dias = 0;
+                    }
+                }
+
+                // Desplazamiento Posterior: el desplazamiento del resultado que salio
+                // cronologicamente despues de cada ocurrencia (sin filtrar por desplazamiento).
+                if (rows.Count > 0)
+                {
+                    var secuencia = await db.lottoActivoResultados.AsNoTracking()
+                                            .OrderBy(r => r.id)
+                                            .Select(r => new
+                                            {
+                                                r.id,
+                                                r.desplazamiento,
+                                                AnimalNombre = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.nombre : null,
+                                                AnimalImageB64 = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.image : null
+                                            })
+                                            .ToListAsync();
+
+                    var siguientePorId = new Dictionary<int, (int? Desplazamiento, string AnimalNombre, string AnimalImageB64)>();
+                    for (int i = 0; i < secuencia.Count; i++)
+                    {
+                        var siguienteInfo = (i + 1 < secuencia.Count)
+                            ? (secuencia[i + 1].desplazamiento, secuencia[i + 1].AnimalNombre, secuencia[i + 1].AnimalImageB64)
+                            : ((int?)null, (string)null, (string)null);
+                        siguientePorId[secuencia[i].id] = siguienteInfo;
+                    }
+
+                    foreach (var row in rows)
+                    {
+                        if (siguientePorId.TryGetValue(row.Id, out var siguiente))
+                        {
+                            row.DesplazamientoPosterior = siguiente.Desplazamiento;
+                            row.AnimalPosteriorNombre = siguiente.AnimalNombre;
+                            row.AnimalPosteriorImageB64 = siguiente.AnimalImageB64;
+                        }
                     }
                 }
 

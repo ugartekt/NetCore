@@ -122,7 +122,7 @@
       <div class="modal-body">
         <div id="occContent">
           <table id="occTable" class="table table-sm table-striped">
-            <thead><tr><th>Fecha</th><th>Hora</th><th>Desplazamiento</th><th>Días</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Hora</th><th>Desplazamiento</th><th>Animalito</th><th>Días</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -141,7 +141,7 @@
                 pageLength: 25,
                 order: [[1, 'desc']],
                 language: {
-                    url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
+                 url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
                 }
             });
 
@@ -162,7 +162,10 @@
                 occTable.clear().draw();
                 $.getJSON('/LottoActivo/Occurrences', { animalId: animalId, year: year, month: month }, function (data) {
                     data.forEach(function (r) {
-                        occTable.row.add([r.fecha, r.hora, r.desplazamiento, r.dias]).draw(false);
+                        var imgHtml = r.animalPosteriorImageB64
+                            ? '<img src="data:image/png;base64,' + r.animalPosteriorImageB64 + '" title="' + (r.animalPosteriorNombre || '') + '" style="max-width:32px; max-height:32px;" class="rounded" />'
+                            : '';
+                        occTable.row.add([r.fecha, r.hora, r.desplazamiento, imgHtml, r.dias]).draw(false);
                     });
                 });
             });
