@@ -18,10 +18,10 @@ namespace WebLottoActivo.Controllers
         [HttpGet]
         public async Task<IActionResult> Occurrences(int animalId, int? year, int? month)
         {
-            // default to selected month/year if not provided
+            // default to selected month/year if not provided; 0 significa "Todas" (sin filtro)
             var today = DateTime.Today;
-            int useYear = year ?? today.Year;
-            int useMonth = month ?? today.Month;
+            int? useYear = year.HasValue ? (year.Value == 0 ? (int?)null : year.Value) : today.Year;
+            int? useMonth = month.HasValue ? (month.Value == 0 ? (int?)null : month.Value) : today.Month;
 
             var rows = await _lottoActivo.GetOccurrencesAsync(animalId, useYear, useMonth);
             return Json(rows);
@@ -30,9 +30,10 @@ namespace WebLottoActivo.Controllers
         [HttpGet]
         public async Task<IActionResult> OccurrencesByDesplazamiento(int desplazamiento, int? year, int? month)
         {
+            // 0 significa "Todas" (sin filtro)
             var today = DateTime.Today;
-            int useYear = year ?? today.Year;
-            int useMonth = month ?? today.Month;
+            int? useYear = year.HasValue ? (year.Value == 0 ? (int?)null : year.Value) : today.Year;
+            int? useMonth = month.HasValue ? (month.Value == 0 ? (int?)null : month.Value) : today.Month;
 
             var rows = await _lottoActivo.GetOccurrencesByDesplazamientoAsync(desplazamiento, useYear, useMonth);
             return Json(rows);
@@ -50,19 +51,25 @@ namespace WebLottoActivo.Controllers
             int? year = today.Year;
             int? month = today.Month;
 
+            // For display purposes, keep the raw selection (0 = "Todas") separate from the
+            // nulled-out filter values below, para que el combo no vuelva a mostrar el año/mes
+            // actual cuando el usuario elige "Todas".
+            int displayYear = today.Year;
+            int displayMonth = today.Month;
+
             // allow query params year/month; treat 0 as 'Todas' (null)
             if (Request.Query.ContainsKey("year"))
             {
-                if (int.TryParse(Request.Query["year"], out var y)) year = y == 0 ? null : (int?)y;
+                if (int.TryParse(Request.Query["year"], out var y)) { displayYear = y; year = y == 0 ? null : (int?)y; }
             }
             if (Request.Query.ContainsKey("month"))
             {
-                if (int.TryParse(Request.Query["month"], out var m)) month = m == 0 ? null : (int?)m;
+                if (int.TryParse(Request.Query["month"], out var m)) { displayMonth = m; month = m == 0 ? null : (int?)m; }
             }
 
             // For display purposes, pick values or defaults
-            ViewBag.SelectedYear = year ?? today.Year;
-            ViewBag.SelectedMonth = month ?? today.Month;
+            ViewBag.SelectedYear = displayYear;
+            ViewBag.SelectedMonth = displayMonth;
 
             // provide available year range to the view
             var range = await _lottoActivo.GetAvailableYearRangeAsync();
@@ -226,6 +233,19 @@ namespace WebLottoActivo.Controllers
             ViewBag.MinYear = range.minYear;
             ViewBag.MaxYear = range.maxYear;
             return View(cantidadTotalAnimalitos);
+        }
+
+        public async Task<IActionResult> ProximaRonda()
+        {
+            var model = await _lottoActivo.GetProximaRondaAsync();
+            return View(model);
+        }
+
+        public async Task<IActionResult> Prediccion(int dias = 3)
+        {
+            if (dias <= 0) dias = 3;
+            var model = await _lottoActivo.GetPrediccionAsync(dias);
+            return View(model);
         }
 
     }

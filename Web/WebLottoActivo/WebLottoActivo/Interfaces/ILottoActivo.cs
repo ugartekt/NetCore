@@ -22,6 +22,8 @@ namespace WebLottoActivo.Interfaces
         public Task<List<Models.ViewModels.SeguimientoHorarioCandidate>> SeguimientoHorarioAsync(int hour, int? year = null, int? month = null);
         public Task<List<Models.ViewModels.Occurrence>> GetOccurrencesAsync(int animalId, int? year = null, int? month = null);
         public Task<List<Models.ViewModels.Occurrence>> GetOccurrencesByDesplazamientoAsync(int desplazamiento, int? year = null, int? month = null);
+        public Task<ProximaRondaViewModel> GetProximaRondaAsync();
+        public Task<PrediccionViewModel> GetPrediccionAsync(int dias = 3);
 
     }
 }

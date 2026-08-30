@@ -21,7 +21,14 @@
                         int minYear = ViewBag.MinYear != null ? (int)ViewBag.MinYear : DateTime.Today.Year - 2;
                         int maxYear = ViewBag.MaxYear != null ? (int)ViewBag.MaxYear : DateTime.Today.Year;
                     }
-                    <option value="0">Todas</option>
+                    @if (selectedMonth == 0)
+                    {
+                        <option value="0" selected>Todas</option>
+                    }
+                    else
+                    {
+                        <option value="0">Todas</option>
+                    }
                     @for (int m = 1; m <= 12; m++)
                     {
                         if (m == selectedMonth)
@@ -40,7 +47,14 @@
             </div>
             <div class="col-auto">
                 <select name="year" id="yearSelect" class="form-select" onchange="this.form.submit()">
-                    <option value="0">Todas</option>
+                    @if ((int)ViewBag.SelectedYear == 0)
+                    {
+                        <option value="0" selected>Todas</option>
+                    }
+                    else
+                    {
+                        <option value="0">Todas</option>
+                    }
                     @for (int y = minYear; y <= maxYear; y++)
                     {
                         if (y == ViewBag.SelectedYear)

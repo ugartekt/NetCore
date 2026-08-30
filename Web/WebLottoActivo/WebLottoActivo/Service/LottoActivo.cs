@@ -18,6 +18,16 @@ namespace WebLottoActivo.Service
     {
         private readonly IServiceScopeFactory _scopeFactory;
 
+        // Orden fisico de la rueda (ruleta americana: 0, 00, 1-36), expresado como
+        // IDs de LottoActivoAnimal (37 = Delfin = casilla "0", 38 = Ballena = casilla "00").
+        // Verificado contra sorteos reales: "desplazamiento" = distancia circular minima
+        // en este arreglo entre el animalito actual y el del sorteo anterior.
+        private static readonly int[] WheelAnimalIds = new int[]
+        {
+            37,28,9,26,30,11,7,20,32,17,5,22,34,15,3,24,36,13,1,38,
+            27,10,25,29,12,8,19,31,18,6,21,33,16,4,23,35,14,2
+        };
+
         private static TimeSpan ParseTimeSafe(string hora)
         {
             if (string.IsNullOrEmpty(hora)) return TimeSpan.Zero;
@@ -172,7 +182,10 @@ namespace WebLottoActivo.Service
                 {
                     var baseRow = all[i];
                     int baseVal = baseRow.desplazamiento;
-                    if (!map.ContainsKey(baseVal)) { map[baseVal] = new List<int>(); mapCount[baseVal] = 0; mapMaxFecha[baseVal] = null; }
+                    if (!map.ContainsKey(baseVal)) { map[baseVal] = new List<int>(); mapCount[baseVal] = 0; }
+                    // "all" está ordenado cronológicamente ascendente, así que la última vez que
+                    // baseVal aparece como baseRow deja aquí la fecha real de su última aparición.
+                    mapMaxFecha[baseVal] = baseRow.fecha;
 
                     // include subsequent records until and including first different desplazamiento encountered
                     for (int j = i + 1; j < all.Count; j++)
@@ -180,7 +193,6 @@ namespace WebLottoActivo.Service
                         var posterior = all[j];
                         map[baseVal].Add(posterior.desplazamiento);
                         mapCount[baseVal]++;
-                        mapMaxFecha[baseVal] = posterior.fecha; // later ones overwrite to keep max
                         if (posterior.desplazamiento != baseVal)
                         {
                             break; // stop for this baseRow
@@ -362,17 +374,18 @@ namespace WebLottoActivo.Service
                     {
                         map[baseVal] = new List<int>();
                         mapCount[baseVal] = 0;
-                        mapMaxFecha[baseVal] = null;
                         mapName[baseVal] = baseRow.Nombre;
                         mapImage[baseVal] = baseRow.AnimalImage;
                     }
+                    // "all" está ordenado cronológicamente ascendente, así que la última vez que
+                    // baseVal aparece como baseRow deja aquí la fecha real de su última aparición.
+                    mapMaxFecha[baseVal] = baseRow.fecha;
 
                     for (int j = i + 1; j < all.Count; j++)
                     {
                         var posterior = all[j];
                         map[baseVal].Add(posterior.AnimalId);
                         mapCount[baseVal]++;
-                        mapMaxFecha[baseVal] = posterior.fecha;
                         if (posterior.AnimalId != baseVal)
                         {
                             break;
@@ -427,12 +440,13 @@ namespace WebLottoActivo.Service
                 // materialize filtered results and compute metrics in memory to be tolerant with hora formats
                 var all = await query.ToListAsync();
 
-                // frequency at the requested hour (parse hora safely)
+                // frequency at the requested hour (parse hora safely). "hora" es texto, así que se
+                // ordena por fecha y por ParseTimeSafe (no por el texto, que ordenaría mal
+                // p.ej. "11:00AM" antes que "07:00PM").
                 var freqAtHour = all
                     .Where(r => ParseTimeSafe(r.hora).Hours == hour)
-                    //.GroupBy(r => r.lottoActivoAnimalId)
-                    //.Select(g => new { AnimalId = g.Key, Count = g.Count() })
-                    .OrderByDescending(x => x.hora)
+                    .OrderByDescending(x => x.fecha)
+                    .ThenByDescending(x => ParseTimeSafe(x.hora))
                     .ToList();
 
                 // previous hour
@@ -455,23 +469,31 @@ namespace WebLottoActivo.Service
                     }
                 }
 
-                // merge scores
+                // merge scores: cuenta base de 1 por cada aparición real a esta hora, más un bono
+                // ponderado por cuántas veces este animal siguió a la hora anterior en el historial.
                 var candidates = new Dictionary<int, double>();
                 foreach (var f in freqAtHour)
                 {
-                    //candidates[f.AnimalId] = f.Count;
+                    candidates[f.lottoActivoAnimalId] = candidates.GetValueOrDefault(f.lottoActivoAnimalId, 0) + 1;
                 }
                 foreach (var t in nextCounts)
                 {
                     candidates[t.Key] = candidates.GetValueOrDefault(t.Key, 0) + t.Value * 0.5; // weight transitions
                 }
 
-                var top = freqAtHour.Select(kv => new Models.ViewModels.SeguimientoHorarioCandidate
+                var animalesLookup = await db.lottoActivoAnimals.AsNoTracking().ToListAsync();
+                var animalPorId = animalesLookup.Where(a => a.id.HasValue).ToDictionary(a => a.id.Value, a => a);
+
+                var top = freqAtHour.Select(kv =>
                 {
-                    AnimalId = kv.lottoActivoAnimalId,
-                    Nombre = db.lottoActivoAnimals.Where(a => a.id == kv.lottoActivoAnimalId).Select(a => a.nombre).FirstOrDefault(),
-                    ImageB64 = db.lottoActivoAnimals.Where(a => a.id == kv.lottoActivoAnimalId).Select(a => a.image).FirstOrDefault(),
-                    Score = 1
+                    var animal = animalPorId.GetValueOrDefault(kv.lottoActivoAnimalId);
+                    return new Models.ViewModels.SeguimientoHorarioCandidate
+                    {
+                        AnimalId = kv.lottoActivoAnimalId,
+                        Nombre = animal?.nombre,
+                        ImageB64 = animal?.image,
+                        Score = candidates.GetValueOrDefault(kv.lottoActivoAnimalId, 0)
+                    };
                 }).ToList();
 
                 // set desplazamiento for each item (use the actual record's desplazamiento)
@@ -503,18 +525,32 @@ namespace WebLottoActivo.Service
                     query = query.Where(r => r.fecha.StartsWith(prefix));
                 }
 
-                var rows = await query.OrderByDescending(r => r.fecha).ThenByDescending(r => r.hora)
-                                      .Select(r => new Models.ViewModels.Occurrence
-                                      {
-                                          Id = r.id,
-                                          Fecha = r.fecha,
-                                          Hora = r.hora,
-                                          Desplazamiento = r.desplazamiento,
-                                          Dias = 0,
-                                          AnimalNombre = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.nombre : null,
-                                          AnimalImageB64 = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.image : null
-                                      })
-                                      .ToListAsync();
+                // "hora" se guarda como texto (ej. "07:00PM"), así que se materializa primero y se
+                // ordena en memoria con ParseTimeSafe para respetar el orden cronológico real
+                // (un ORDER BY de texto pondría "11:00AM" antes que "07:00PM").
+                var raw = await query.Select(r => new
+                                     {
+                                         r.id,
+                                         r.fecha,
+                                         r.hora,
+                                         r.desplazamiento,
+                                         AnimalNombre = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.nombre : null,
+                                         AnimalImageB64 = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.image : null
+                                     })
+                                     .ToListAsync();
+
+                var rows = raw.OrderByDescending(r => r.fecha).ThenByDescending(r => ParseTimeSafe(r.hora))
+                              .Select(r => new Models.ViewModels.Occurrence
+                              {
+                                  Id = r.id,
+                                  Fecha = r.fecha,
+                                  Hora = r.hora,
+                                  Desplazamiento = r.desplazamiento,
+                                  Dias = 0,
+                                  AnimalNombre = r.AnimalNombre,
+                                  AnimalImageB64 = r.AnimalImageB64
+                              })
+                              .ToList();
 
                 // compute Dias on the descending-ordered list: for each row, Dias = curr.Date - nextOlder.Date
                 // rows are ordered descending by fecha,hora (newest first)
@@ -595,18 +631,31 @@ namespace WebLottoActivo.Service
                     query = query.Where(r => r.fecha.StartsWith(prefix));
                 }
 
-                var rows = await query.OrderByDescending(r => r.fecha).ThenByDescending(r => r.hora)
-                                      .Select(r => new Models.ViewModels.Occurrence
-                                      {
-                                          Id = r.id,
-                                          Fecha = r.fecha,
-                                          Hora = r.hora,
-                                          Desplazamiento = r.desplazamiento,
-                                          Dias = 0,
-                                          AnimalNombre = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.nombre : null,
-                                          AnimalImageB64 = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.image : null
-                                      })
-                                      .ToListAsync();
+                // ver comentario equivalente en GetOccurrencesAsync: "hora" es texto y no se puede
+                // ordenar cronológicamente en el propio SQL, se materializa y se ordena en memoria.
+                var raw = await query.Select(r => new
+                                     {
+                                         r.id,
+                                         r.fecha,
+                                         r.hora,
+                                         r.desplazamiento,
+                                         AnimalNombre = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.nombre : null,
+                                         AnimalImageB64 = r.LottoActivoAnimal != null ? r.LottoActivoAnimal.image : null
+                                     })
+                                     .ToListAsync();
+
+                var rows = raw.OrderByDescending(r => r.fecha).ThenByDescending(r => ParseTimeSafe(r.hora))
+                              .Select(r => new Models.ViewModels.Occurrence
+                              {
+                                  Id = r.id,
+                                  Fecha = r.fecha,
+                                  Hora = r.hora,
+                                  Desplazamiento = r.desplazamiento,
+                                  Dias = 0,
+                                  AnimalNombre = r.AnimalNombre,
+                                  AnimalImageB64 = r.AnimalImageB64
+                              })
+                              .ToList();
 
                 // compute Dias on descending list
                 for (int i = 0; i < rows.Count; i++)
@@ -671,7 +720,141 @@ namespace WebLottoActivo.Service
             }
         }
 
+        public async Task<ProximaRondaViewModel> GetProximaRondaAsync()
+        {
+            try
+            {
+                var ultimo = await UltimoAnimalitoDesplazamientoAsync();
+                if (ultimo == null) return new ProximaRondaViewModel();
 
+                int total = WheelAnimalIds.Length;
+                int posActual = Array.IndexOf(WheelAnimalIds, ultimo.lottoActivoAnimalId);
+                if (posActual < 0) return new ProximaRondaViewModel();
+
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var animales = await db.lottoActivoAnimals.AsNoTracking().ToListAsync();
+                var animalPorId = animales.Where(a => a.id.HasValue).ToDictionary(a => a.id.Value, a => a);
+
+                var items = new List<ProximaRondaItem>();
+                for (int offset = 1; offset <= total / 2; offset++)
+                {
+                    int idxDer = (posActual + offset) % total;
+                    int idxIzq = ((posActual - offset) % total + total) % total;
+
+                    var animalDer = animalPorId.GetValueOrDefault(WheelAnimalIds[idxDer]);
+                    var animalIzq = animalPorId.GetValueOrDefault(WheelAnimalIds[idxIzq]);
+
+                    items.Add(new ProximaRondaItem
+                    {
+                        Offset = offset,
+                        AnimalIzqId = WheelAnimalIds[idxIzq],
+                        AnimalIzqNombre = animalIzq?.nombre,
+                        AnimalIzqImageB64 = animalIzq?.image,
+                        AnimalDerId = WheelAnimalIds[idxDer],
+                        AnimalDerNombre = animalDer?.nombre,
+                        AnimalDerImageB64 = animalDer?.image
+                    });
+                }
+
+                var animalActual = animalPorId.GetValueOrDefault(ultimo.lottoActivoAnimalId);
+
+                return new ProximaRondaViewModel
+                {
+                    UltimoAnimalId = ultimo.lottoActivoAnimalId,
+                    UltimoAnimalNombre = animalActual?.nombre,
+                    UltimoAnimalImageB64 = animalActual?.image,
+                    UltimoDesplazamiento = ultimo.desplazamiento,
+                    UltimaFecha = ultimo.fecha,
+                    UltimaHora = ultimo.hora,
+                    Items = items
+                };
+            }
+            catch
+            {
+                return new ProximaRondaViewModel();
+            }
+        }
+
+        public async Task<PrediccionViewModel> GetPrediccionAsync(int dias = 3)
+        {
+            try
+            {
+                if (dias <= 0) dias = 3;
+
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                var all = await db.lottoActivoResultados.AsNoTracking()
+                                  .Select(r => new { r.id, r.fecha, r.hora, r.desplazamiento, r.lottoActivoAnimalId })
+                                  .ToListAsync();
+
+                var hoy = DateTime.Today;
+                string cutoff = hoy.AddDays(-(dias - 1)).ToString("yyyy-MM-dd");
+
+                var desplazamientos = new List<PrediccionItem>();
+                for (int d = 0; d <= 19; d++)
+                {
+                    var filas = all.Where(r => r.desplazamiento == d)
+                                   .OrderByDescending(r => r.fecha).ThenByDescending(r => ParseTimeSafe(r.hora))
+                                   .ToList();
+                    var ultimo = filas.FirstOrDefault();
+                    int diasSinSalir = (ultimo != null && DateTime.TryParse(ultimo.fecha, out var uf))
+                        ? (hoy - uf.Date).Days
+                        : int.MaxValue;
+                    int frecuencia = filas.Count(r => r.fecha.CompareTo(cutoff) >= 0);
+
+                    desplazamientos.Add(new PrediccionItem
+                    {
+                        DesplazamientoValor = d,
+                        Nombre = d.ToString("D2"),
+                        UltimaFecha = ultimo?.fecha,
+                        UltimaHora = ultimo?.hora,
+                        DiasSinSalir = diasSinSalir,
+                        FrecuenciaUltimosDias = frecuencia,
+                        EsCandidato = diasSinSalir >= dias
+                    });
+                }
+
+                var animales = await db.lottoActivoAnimals.AsNoTracking().OrderBy(a => a.id).ToListAsync();
+                var animalitos = new List<PrediccionItem>();
+                foreach (var animal in animales)
+                {
+                    if (!animal.id.HasValue) continue;
+                    var filas = all.Where(r => r.lottoActivoAnimalId == animal.id.Value)
+                                   .OrderByDescending(r => r.fecha).ThenByDescending(r => ParseTimeSafe(r.hora))
+                                   .ToList();
+                    var ultimo = filas.FirstOrDefault();
+                    int diasSinSalir = (ultimo != null && DateTime.TryParse(ultimo.fecha, out var uf))
+                        ? (hoy - uf.Date).Days
+                        : int.MaxValue;
+                    int frecuencia = filas.Count(r => r.fecha.CompareTo(cutoff) >= 0);
+
+                    animalitos.Add(new PrediccionItem
+                    {
+                        AnimalId = animal.id,
+                        Nombre = animal.nombre,
+                        ImageB64 = animal.image,
+                        UltimaFecha = ultimo?.fecha,
+                        UltimaHora = ultimo?.hora,
+                        DiasSinSalir = diasSinSalir,
+                        FrecuenciaUltimosDias = frecuencia,
+                        EsCandidato = diasSinSalir >= dias
+                    });
+                }
+
+                return new PrediccionViewModel
+                {
+                    Dias = dias,
+                    Desplazamientos = desplazamientos.OrderByDescending(x => x.DiasSinSalir).ToList(),
+                    Animalitos = animalitos.OrderByDescending(x => x.DiasSinSalir).ToList()
+                };
+            }
+            catch
+            {
+                return new PrediccionViewModel();
+            }
+        }
 
     }
 }

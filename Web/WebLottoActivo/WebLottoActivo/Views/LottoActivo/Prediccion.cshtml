@@ -1,0 +1,108 @@
+@using WebLottoActivo.Models.ViewModels
+@model PrediccionViewModel
+@{
+    ViewData["Title"] = "Prediccion";
+}
+
+<div class="container mt-4 page-bottom-padding">
+    <h2 class="mb-4"><i class="bi bi-graph-up-arrow"></i> Predicción</h2>
+
+    <div class="alert alert-info">
+        Es un juego de azar: esto no garantiza ningún resultado, solo resalta los animalitos y desplazamientos
+        que llevan más tiempo sin salir, para apoyar tu propio seguimiento.
+    </div>
+
+    <form method="get" asp-action="Prediccion" class="mb-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label for="dias" class="form-label fw-bold">Días sin salir para considerar candidato:</label>
+                <input type="number" min="1" name="dias" id="dias" class="form-control" value="@Model.Dias" />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary">Analizar</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="row">
+        <div class="col-12 col-lg-6">
+            <h5><i class="bi bi-arrow-repeat"></i> Desplazamiento</h5>
+            <div class="table-responsive">
+                <table id="prediccionDesplazamiento" class="table table-sm table-bordered table-hover table-striped">
+                    <thead class="table-info">
+                        <tr>
+                            <th>Desplazamiento</th>
+                            <th>Última Fecha</th>
+                            <th>Última Hora</th>
+                            <th>Días sin salir</th>
+                            <th>Frecuencia últimos @Model.Dias días</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Desplazamientos)
+                        {
+                            <tr class="@(item.EsCandidato ? "table-warning" : "")">
+                                <td class="fw-bold">@item.Nombre</td>
+                                <td>@item.UltimaFecha</td>
+                                <td>@item.UltimaHora</td>
+                                <td>@(item.DiasSinSalir == int.MaxValue ? "Nunca" : item.DiasSinSalir.ToString())</td>
+                                <td>@item.FrecuenciaUltimosDias</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <h5><i class="bi bi-egg"></i> Animalito</h5>
+            <div class="table-responsive">
+                <table id="prediccionAnimalito" class="table table-sm table-bordered table-hover table-striped">
+                    <thead class="table-info">
+                        <tr>
+                            <th>Animalito</th>
+                            <th>Última Fecha</th>
+                            <th>Última Hora</th>
+                            <th>Días sin salir</th>
+                            <th>Frecuencia últimos @Model.Dias días</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Animalitos)
+                        {
+                            <tr class="@(item.EsCandidato ? "table-warning" : "")">
+                                <td class="align-middle">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <img src="data:image/png;base64,@item.ImageB64" style="max-width:32px; max-height:32px;" class="rounded" />
+                                        <span>@item.Nombre</span>
+                                    </div>
+                                </td>
+                                <td>@item.UltimaFecha</td>
+                                <td>@item.UltimaHora</td>
+                                <td>@(item.DiasSinSalir == int.MaxValue ? "Nunca" : item.DiasSinSalir.ToString())</td>
+                                <td>@item.FrecuenciaUltimosDias</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('#prediccionDesplazamiento').DataTable({
+                pageLength: 20,
+                order: [[3, 'desc']],
+                language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' }
+            });
+            $('#prediccionAnimalito').DataTable({
+                pageLength: 20,
+                order: [[3, 'desc']],
+                language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json' }
+            });
+        });
+    </script>
+}
