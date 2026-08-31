@@ -1,5 +1,5 @@
 @using WebLottoActivo.Models.ViewModels
-@model List<SeguimientoHorarioCandidate>
+@model SeguimientoHorarioViewModel
 @{
     ViewData["Title"] = "Seguimiento Horario";
     int selectedHour = ViewBag.SelectedHour ?? 8;
@@ -7,6 +7,7 @@
     int maxYear = ViewBag.MaxYear ?? DateTime.Today.Year;
     int selectedYear = ViewBag.SelectedYear ?? DateTime.Today.Year;
     int selectedMonth = ViewBag.SelectedMonth ?? DateTime.Today.Month;
+    int columnasPorFila = 10;
 }
 
 <div class="container mt-4 page-bottom-padding">
@@ -15,8 +16,21 @@
     <form method="get" asp-action="SeguimientoHorario" class="mb-3">
         <div class="row g-2 align-items-end">
             <div class="col-auto">
-                <label class="form-label fw-bold">Hora (24h):</label>
-                <input type="number" name="hour" class="form-control" min="8" max="19" value="@selectedHour" />
+                <label class="form-label fw-bold">Hora:</label>
+                <select name="hour" class="form-select">
+                    @for (int h = 8; h <= 19; h++)
+                    {
+                        var label = new DateTime(2000, 1, 1, h, 0, 0).ToString("hh:mmtt", System.Globalization.CultureInfo.InvariantCulture);
+                        if (h == selectedHour)
+                        {
+                            <option value="@h" selected>@label</option>
+                        }
+                        else
+                        {
+                            <option value="@h">@label</option>
+                        }
+                    }
+                </select>
             </div>
             <div class="col-auto">
                 <label class="form-label fw-bold">Mes:</label>
@@ -58,29 +72,139 @@
         </div>
     </form>
 
+    @{
+        var candidatos = Model?.Candidatos ?? new List<SeguimientoHorarioCandidate>();
+        var animalesRepetidos = Model?.AnimalesRepetidos ?? new List<AnimalRepetidoHorario>();
+        var desplazamientosRepetidos = Model?.DesplazamientosRepetidos ?? new List<DesplazamientoRepetidoHorario>();
+    }
+
     <div class="row">
         <div class="col-12">
             <div class="card">
                 <div class="card-body">
-                    <h5>Candidatos</h5>
-                    <div class="d-flex gap-3 flex-wrap">
-                        @if (Model != null && Model.Any())
-                        {
-                            foreach (var c in Model)
-                            {
-                                <div class="text-center">
-                                    <img src="data:image/png;base64,@c.ImageB64" class="rounded" style="max-width:64px; max-height:64px;" alt="@c.Nombre" />
-                                    <div>@c.Nombre</div>
-                                    <div class="text-muted">(@c.Desplazamiento)</div>
-                                    <div class="text-muted">Score: @String.Format("{0:0.00}", c.Score)</div>
-                                </div>
-                            }
-                        }
-                        else
-                        {
-                            <span class="text-muted">No hay candidatos para los filtros seleccionados.</span>
-                        }
-                    </div>
+                    <h5>Candidatos (@candidatos.Count)</h5>
+                    @if (candidatos.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-borderless">
+                                <tbody>
+                                    @for (int i = 0; i < candidatos.Count; i += columnasPorFila)
+                                    {
+                                        <tr>
+                                            @for (int j = i; j < i + columnasPorFila; j++)
+                                            {
+                                                if (j < candidatos.Count)
+                                                {
+                                                    var c = candidatos[j];
+                                                    <td class="text-center align-middle position-relative">
+                                                        <div class="position-relative d-inline-block">
+                                                            <img src="data:image/png;base64,@c.ImageB64" class="rounded" style="max-width:56px; max-height:56px;" alt="@c.Nombre" />
+                                                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-secondary">@c.Dia</span>
+                                                        </div>
+                                                        <div>@c.Nombre</div>
+                                                        @if (c.Veces > 1)
+                                                        {
+                                                            <div class="fw-bold text-danger">(@c.Desplazamiento)</div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="text-muted">(@c.Desplazamiento)</div>
+                                                        }
+                                                    </td>
+                                                }
+                                                else
+                                                {
+                                                    <td></td>
+                                                }
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <span class="text-muted">No hay candidatos para los filtros seleccionados.</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-12 col-lg-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5>Animales repetidos en esta hora</h5>
+                    @if (animalesRepetidos.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-striped">
+                                <thead class="table-info">
+                                    <tr>
+                                        <th>Animalito</th>
+                                        <th>Fecha</th>
+                                        <th>Cantidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var a in animalesRepetidos)
+                                    {
+                                        <tr>
+                                            <td class="align-middle">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <img src="data:image/png;base64,@a.ImageB64" style="max-width:40px; max-height:40px;" class="rounded" alt="@a.Nombre" />
+                                                    <span>@a.Nombre</span>
+                                                </div>
+                                            </td>
+                                            <td class="align-middle fw-bold text-danger">@a.Dias</td>
+                                            <td class="align-middle fw-bold text-danger">@a.Cantidad</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <span class="text-muted">Ningún animal se ha repetido en esta hora para los filtros seleccionados.</span>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5>Desplazamientos repetidos en esta hora</h5>
+                    @if (desplazamientosRepetidos.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover table-striped">
+                                <thead class="table-info">
+                                    <tr>
+                                        <th>Desplazamiento</th>
+                                        <th>Fecha</th>
+                                        <th>Cantidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var d in desplazamientosRepetidos)
+                                    {
+                                        <tr>
+                                            <td class="align-middle">@d.Desplazamiento</td>
+                                            <td class="align-middle fw-bold text-danger">@d.Dias</td>
+                                            <td class="align-middle fw-bold text-danger">@d.Cantidad</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <span class="text-muted">Ningún desplazamiento se ha repetido en esta hora para los filtros seleccionados.</span>
+                    }
                 </div>
             </div>
         </div>

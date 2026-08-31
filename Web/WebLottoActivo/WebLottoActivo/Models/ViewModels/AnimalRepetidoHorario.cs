@@ -1,12 +1,12 @@
 namespace WebLottoActivo.Models.ViewModels
 {
-    public class SeguimientoHorarioCandidate
+    public class AnimalRepetidoHorario
     {
         public int AnimalId { get; set; }
         public string Nombre { get; set; }
         public string ImageB64 { get; set; }
-        public int Veces { get; set; }
-        public int Desplazamiento { get; set; }
-        public int Dia { get; set; }
+        public string Dias { get; set; }
+        public int Cantidad { get; set; }
+        public string UltimaFecha { get; set; }
     }
 }

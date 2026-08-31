@@ -200,8 +200,8 @@ namespace WebLottoActivo.Controllers
             ViewBag.SelectedMonth = month;
             ViewBag.SelectedHour = selHour;
 
-            var preds = await _lottoActivo.SeguimientoHorarioAsync(selHour, year, month);
-            return View("SeguimientoHorario", preds);
+            var model = await _lottoActivo.SeguimientoHorarioAsync(selHour, year, month);
+            return View("SeguimientoHorario", model);
         }
 
         public async Task<IActionResult> HistorialResumenDiario(string date)

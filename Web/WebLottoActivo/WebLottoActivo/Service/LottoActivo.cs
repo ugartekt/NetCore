@@ -419,7 +419,7 @@ namespace WebLottoActivo.Service
             }
         }
 
-        public async Task<List<Models.ViewModels.SeguimientoHorarioCandidate>> SeguimientoHorarioAsync(int hour,int? year = null, int? month = null)
+        public async Task<Models.ViewModels.SeguimientoHorarioViewModel> SeguimientoHorarioAsync(int hour,int? year = null, int? month = null)
         {
             try
             {
@@ -449,65 +449,78 @@ namespace WebLottoActivo.Service
                     .ThenByDescending(x => ParseTimeSafe(x.hora))
                     .ToList();
 
-                // previous hour
-                var prevHour = (hour + 23) % 24;
-
-                // build mapping of next-of-prev: for each date order by time and look for records where an entry at prevHour is followed by another
-                var nextCounts = new Dictionary<int,int>();
-                var byDate = all.GroupBy(r => r.fecha);
-                foreach (var group in byDate)
-                {
-                    var ordered = group.OrderBy(r => ParseTimeSafe(r.hora)).ThenBy(r => r.id).ToList();
-                    for (int i = 0; i < ordered.Count - 1; i++)
-                    {
-                        if (ParseTimeSafe(ordered[i].hora).Hours == prevHour)
-                        {
-                            var next = ordered[i+1];
-                            nextCounts.TryGetValue(next.lottoActivoAnimalId, out int c);
-                            nextCounts[next.lottoActivoAnimalId] = c + 1;
-                        }
-                    }
-                }
-
-                // merge scores: cuenta base de 1 por cada aparición real a esta hora, más un bono
-                // ponderado por cuántas veces este animal siguió a la hora anterior en el historial.
-                var candidates = new Dictionary<int, double>();
-                foreach (var f in freqAtHour)
-                {
-                    candidates[f.lottoActivoAnimalId] = candidates.GetValueOrDefault(f.lottoActivoAnimalId, 0) + 1;
-                }
-                foreach (var t in nextCounts)
-                {
-                    candidates[t.Key] = candidates.GetValueOrDefault(t.Key, 0) + t.Value * 0.5; // weight transitions
-                }
+                // Veces reales que cada animal/desplazamiento salio en esta hora (dentro del filtro).
+                var vecesPorAnimal = freqAtHour.GroupBy(f => f.lottoActivoAnimalId)
+                    .ToDictionary(g => g.Key, g => g.Count());
 
                 var animalesLookup = await db.lottoActivoAnimals.AsNoTracking().ToListAsync();
                 var animalPorId = animalesLookup.Where(a => a.id.HasValue).ToDictionary(a => a.id.Value, a => a);
 
-                var top = freqAtHour.Select(kv =>
+                // El dia (del mes) en que salio cada sorteo, para mostrar "13|17|30" en las tablas de repetidos.
+                int DiaDelMes(string fecha) => DateTime.TryParseExact(fecha, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d) ? d.Day : 0;
+
+                // Un candidato por cada sorteo real de esta hora (sin deduplicar), mas reciente primero.
+                var candidatos = freqAtHour.Select(f =>
                 {
-                    var animal = animalPorId.GetValueOrDefault(kv.lottoActivoAnimalId);
+                    var animal = animalPorId.GetValueOrDefault(f.lottoActivoAnimalId);
                     return new Models.ViewModels.SeguimientoHorarioCandidate
                     {
-                        AnimalId = kv.lottoActivoAnimalId,
+                        AnimalId = f.lottoActivoAnimalId,
                         Nombre = animal?.nombre,
                         ImageB64 = animal?.image,
-                        Score = candidates.GetValueOrDefault(kv.lottoActivoAnimalId, 0)
+                        Veces = vecesPorAnimal.GetValueOrDefault(f.lottoActivoAnimalId, 0),
+                        Desplazamiento = f.desplazamiento,
+                        Dia = DiaDelMes(f.fecha)
                     };
                 }).ToList();
 
-                // set desplazamiento for each item (use the actual record's desplazamiento)
-                for (int i = 0; i < top.Count; i++)
-                {
-                    var rec = freqAtHour[i];
-                    top[i].Desplazamiento = rec.desplazamiento;
-                }
+                // Animales que se repitieron en esta hora, con los dias en que salieron (mas reciente primero).
+                var animalesRepetidos = freqAtHour.GroupBy(f => f.lottoActivoAnimalId)
+                    .Where(g => g.Count() > 1)
+                    .Select(g =>
+                    {
+                        var animal = animalPorId.GetValueOrDefault(g.Key);
+                        var ordenados = g.OrderBy(x => x.fecha).ThenBy(x => ParseTimeSafe(x.hora)).ToList();
+                        return new Models.ViewModels.AnimalRepetidoHorario
+                        {
+                            AnimalId = g.Key,
+                            Nombre = animal?.nombre,
+                            ImageB64 = animal?.image,
+                            Dias = string.Join("|", ordenados.Select(x => DiaDelMes(x.fecha))),
+                            Cantidad = ordenados.Count,
+                            UltimaFecha = ordenados.Last().fecha
+                        };
+                    })
+                    .OrderByDescending(a => a.UltimaFecha)
+                    .ToList();
 
-                return top;
+                // Desplazamientos que se repitieron en esta hora, con los dias en que salieron (mas reciente primero).
+                var desplazamientosRepetidos = freqAtHour.GroupBy(f => f.desplazamiento)
+                    .Where(g => g.Count() > 1)
+                    .Select(g =>
+                    {
+                        var ordenados = g.OrderBy(x => x.fecha).ThenBy(x => ParseTimeSafe(x.hora)).ToList();
+                        return new Models.ViewModels.DesplazamientoRepetidoHorario
+                        {
+                            Desplazamiento = g.Key,
+                            Dias = string.Join("|", ordenados.Select(x => DiaDelMes(x.fecha))),
+                            Cantidad = ordenados.Count,
+                            UltimaFecha = ordenados.Last().fecha
+                        };
+                    })
+                    .OrderByDescending(d => d.UltimaFecha)
+                    .ToList();
+
+                return new Models.ViewModels.SeguimientoHorarioViewModel
+                {
+                    Candidatos = candidatos,
+                    AnimalesRepetidos = animalesRepetidos,
+                    DesplazamientosRepetidos = desplazamientosRepetidos
+                };
             }
             catch
             {
-                return new List<Models.ViewModels.SeguimientoHorarioCandidate>();
+                return new Models.ViewModels.SeguimientoHorarioViewModel();
             }
         }
 
