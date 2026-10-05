@@ -235,10 +235,40 @@ namespace WebLottoActivo.Controllers
             return View(cantidadTotalAnimalitos);
         }
 
-        public async Task<IActionResult> ProximaRonda()
+        public async Task<IActionResult> ProximaRondaModal()
         {
             var model = await _lottoActivo.GetProximaRondaAsync();
+            return PartialView("_ProximaRondaModal", model);
+        }
+
+        public async Task<IActionResult> Repeticion(string date, int desfase = 2, int ventana = 30)
+        {
+            var model = await _lottoActivo.GetRepeticionAsync(date, desfase, ventana);
             return View(model);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> HistorialPatron(int id, string date, int desfase = 2)
+        {
+            var rows = await _lottoActivo.GetHistorialPatronAsync(id, date, desfase);
+            return Json(rows);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearPatron(string codigo, List<string> horas, string date, int desfase = 2, int ventana = 30)
+        {
+            var error = await _lottoActivo.CrearPatronAsync(codigo, horas);
+            if (error != null) TempData["PatronError"] = error;
+            return RedirectToAction(nameof(Repeticion), new { date, desfase, ventana });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarPatron(int id, string date, int desfase = 2, int ventana = 30)
+        {
+            await _lottoActivo.EliminarPatronAsync(id);
+            return RedirectToAction(nameof(Repeticion), new { date, desfase, ventana });
         }
 
         public async Task<IActionResult> Prediccion(int dias = 3)

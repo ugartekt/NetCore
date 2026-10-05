@@ -30,6 +30,11 @@
             <div class="col-12 col-md-2 d-flex align-items-end">
                 <button type="submit" class="btn btn-primary w-100">Buscar</button>
             </div>
+            <div class="col-12 col-md-2 d-flex align-items-end">
+                <button type="button" class="btn btn-outline-primary w-100" data-bs-toggle="modal" data-bs-target="#modalProximaRonda">
+                    <i class="bi bi-compass"></i> Próxima ronda
+                </button>
+            </div>
         </div>
     </form>
     <hr style="border: 1px solid #ccc; margin: 20px 0;" />
@@ -170,8 +175,50 @@
     </div>
 </div>
 
+<!-- Modal Próxima Ronda -->
+<div class="modal fade" id="modalProximaRonda" tabindex="-1" aria-labelledby="modalProximaRondaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalProximaRondaLabel"><i class="bi bi-compass"></i> Próxima Ronda</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body" id="modalProximaRondaBody"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .proxima-ronda-horizontal img {
+        max-width: 28px;
+        max-height: 28px;
+    }
+
+    .proxima-ronda-horizontal td,
+    .proxima-ronda-horizontal th {
+        white-space: nowrap;
+        font-size: 0.75rem;
+        padding: 0.25rem;
+    }
+</style>
+
 @section Scripts {
     <script>
+        document.getElementById('modalProximaRonda').addEventListener('show.bs.modal', function () {
+            var body = document.getElementById('modalProximaRondaBody');
+            body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>';
+
+            fetch('@Url.Action("ProximaRondaModal", "LottoActivo")')
+                .then(function (r) {
+                    if (!r.ok) throw new Error(r.status);
+                    return r.text();
+                })
+                .then(function (html) { body.innerHTML = html; })
+                .catch(function () {
+                    body.innerHTML = '<div class="alert alert-danger mb-0">No se pudo cargar la próxima ronda.</div>';
+                });
+        });
+
         function cambiarDia(delta) {
             var input = document.getElementById('fecha');
             var partes = input.value.split('-');

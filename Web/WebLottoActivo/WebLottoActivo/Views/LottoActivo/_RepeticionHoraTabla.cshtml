@@ -1,0 +1,37 @@
+@using WebLottoActivo.Models.ViewModels
+@model List<RepeticionHora>
+@{
+    int total = Model.Sum(h => h.Total);
+    double promedio = total == 0 ? 0 : (double)Model.Sum(h => h.Aciertos) / total;
+}
+
+<div class="table-responsive">
+    <table class="table table-bordered table-sm table-hover">
+        <thead class="table-info">
+            <tr>
+                <th class="text-center">Hora</th>
+                <th class="text-center">Repiten</th>
+                <th class="text-center">%</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var h in Model)
+            {
+                // Resalta las horas que superan el promedio por 5 puntos o más
+                var destacado = h.Porcentaje >= promedio + 0.05;
+                <tr class="@(destacado ? "table-success fw-bold" : "")">
+                    <td class="text-center">@h.Hora</td>
+                    <td class="text-center">@h.Aciertos / @h.Total</td>
+                    <td class="text-center">@h.Porcentaje.ToString("P0")</td>
+                </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr class="table-light">
+                <td class="text-center fw-bold">Promedio</td>
+                <td></td>
+                <td class="text-center fw-bold">@promedio.ToString("P0")</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>

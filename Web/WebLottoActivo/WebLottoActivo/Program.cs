@@ -22,6 +22,17 @@ builder.Services.AddSingleton<ILottoActivo, LottoActivo>();
 
 var app = builder.Build();
 
+// Crea la tabla de patrones si no existe (la base no usa migraciones)
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""LottoActivoPatron"" (
+        ""id""     INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        ""codigo"" TEXT NOT NULL UNIQUE,
+        ""horas""  TEXT NOT NULL
+    );");
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {

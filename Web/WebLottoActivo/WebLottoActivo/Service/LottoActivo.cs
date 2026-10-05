@@ -869,5 +869,288 @@ namespace WebLottoActivo.Service
             }
         }
 
+        public async Task<RepeticionViewModel> GetRepeticionAsync(string date, int desfase = 2, int ventana = 30)
+        {
+            try
+            {
+                if (desfase <= 0) desfase = 2;
+                if (!new[] { 7, 15, 30, 45, 60 }.Contains(ventana)) ventana = 30;
+                if (!DateTime.TryParse(date, out var fecha)) fecha = DateTime.Today;
+                string fechaStr = fecha.ToString("yyyy-MM-dd");
+                string origenStr = fecha.AddDays(-desfase).ToString("yyyy-MM-dd");
+
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                var all = await db.lottoActivoResultados.AsNoTracking()
+                                  .OrderBy(r => r.id)
+                                  .Select(r => new { r.fecha, r.hora, r.lottoActivoAnimalId })
+                                  .ToListAsync();
+                var animalPorId = (await db.lottoActivoAnimals.AsNoTracking().ToListAsync())
+                                  .Where(a => a.id.HasValue)
+                                  .ToDictionary(a => a.id.Value, a => a);
+
+                var porDia = all.GroupBy(r => r.fecha)
+                                .ToDictionary(g => g.Key, g => g.Select(r => (Hora: r.hora, AnimalId: r.lottoActivoAnimalId)).ToList());
+
+                // Estadísticas solo con los días completos de la ventana anteriores a la fecha consultada
+                string inicioStr = fecha.AddDays(-ventana).ToString("yyyy-MM-dd");
+                var diasCompletos = porDia.Keys.Where(f => f.CompareTo(inicioStr) >= 0 && f.CompareTo(fechaStr) < 0)
+                                               .OrderBy(f => f).ToList();
+
+                List<(HashSet<int> Hoy, HashSet<int> Prev, string Dia, string DiaPrev)> Pares(int lag)
+                {
+                    var pares = new List<(HashSet<int>, HashSet<int>, string, string)>();
+                    foreach (var dia in diasCompletos)
+                    {
+                        if (!DateTime.TryParse(dia, out var d)) continue;
+                        string prev = d.AddDays(-lag).ToString("yyyy-MM-dd");
+                        if (!porDia.ContainsKey(prev)) continue;
+                        pares.Add((porDia[dia].Select(x => x.AnimalId).ToHashSet(),
+                                   porDia[prev].Select(x => x.AnimalId).ToHashSet(), dia, prev));
+                    }
+                    return pares;
+                }
+
+                double Tasa(List<(HashSet<int> Hoy, HashSet<int> Prev, string Dia, string DiaPrev)> pares)
+                {
+                    int candidatos = pares.Sum(p => p.Prev.Count);
+                    int aciertos = pares.Sum(p => p.Prev.Count(p.Hoy.Contains));
+                    return candidatos == 0 ? 0 : (double)aciertos / candidatos;
+                }
+
+                var paresDesfase = Pares(desfase);
+                double tasaBase = Enumerable.Range(15, 16).Select(lag => Tasa(Pares(lag))).Average();
+
+                // Por hora: en qué hora del día cae la repetición, y de qué hora del día origen viene
+                var destino = new Dictionary<string, RepeticionHora>();
+                var origen = new Dictionary<string, RepeticionHora>();
+                foreach (var p in paresDesfase)
+                {
+                    foreach (var (hora, animalId) in porDia[p.Dia])
+                    {
+                        if (!destino.TryGetValue(hora, out var h)) destino[hora] = h = new RepeticionHora { Hora = hora };
+                        h.Total++;
+                        if (p.Prev.Contains(animalId)) h.Aciertos++;
+                    }
+                    foreach (var (hora, animalId) in porDia[p.DiaPrev])
+                    {
+                        if (!origen.TryGetValue(hora, out var h)) origen[hora] = h = new RepeticionHora { Hora = hora };
+                        h.Total++;
+                        if (p.Hoy.Contains(animalId)) h.Aciertos++;
+                    }
+                }
+
+                // Candidatos: animalitos del día origen y si ya salieron en la fecha consultada
+                var filasHoy = porDia.GetValueOrDefault(fechaStr) ?? new List<(string Hora, int AnimalId)>();
+                var candidatos = (porDia.GetValueOrDefault(origenStr) ?? new List<(string Hora, int AnimalId)>())
+                    .GroupBy(x => x.AnimalId)
+                    .Select(g =>
+                    {
+                        var animal = animalPorId.GetValueOrDefault(g.Key);
+                        var salidaHoy = filasHoy.Where(x => x.AnimalId == g.Key).Select(x => x.Hora).ToList();
+                        return new RepeticionCandidato
+                        {
+                            AnimalId = g.Key,
+                            Nombre = animal?.nombre,
+                            ImageB64 = animal?.image,
+                            HorasOrigen = string.Join(", ", g.Select(x => x.Hora)),
+                            YaSalio = salidaHoy.Any(),
+                            HoraHoy = string.Join(", ", salidaHoy)
+                        };
+                    })
+                    .ToList();
+
+                // Patrones: un patrón "sale" cuando todos los animalitos de sus horas en el día origen
+                // vuelven a salir "desfase" días después
+                var patronesDb = await db.lottoActivoPatrones.AsNoTracking().OrderBy(p => p.codigo).ToListAsync();
+                var setHoy = filasHoy.Select(x => x.AnimalId).ToHashSet();
+                var patrones = new List<RepeticionPatron>();
+                foreach (var p in patronesDb)
+                {
+                    var horas = p.horas.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                       .OrderBy(ParseTimeSafe).ToList();
+
+                    bool Salio(string diaDestino)
+                    {
+                        if (!DateTime.TryParse(diaDestino, out var d)) return false;
+                        if (!porDia.TryGetValue(diaDestino, out var filasDestino)) return false;
+                        if (!porDia.TryGetValue(d.AddDays(-desfase).ToString("yyyy-MM-dd"), out var filasOrigen)) return false;
+                        var destinoSet = filasDestino.Select(x => x.AnimalId).ToHashSet();
+                        return horas.All(h => filasOrigen.Any(x => x.Hora == h && destinoSet.Contains(x.AnimalId)));
+                    }
+
+                    // Última vez: se busca en todo el histórico anterior a la fecha consultada
+                    var historico = porDia.Keys.Where(f => f.CompareTo(fechaStr) < 0).Where(Salio).ToList();
+                    var ultima = historico.Max();
+
+                    var filasOrigenHoy = porDia.GetValueOrDefault(origenStr) ?? new List<(string Hora, int AnimalId)>();
+                    patrones.Add(new RepeticionPatron
+                    {
+                        Id = p.id,
+                        Codigo = p.codigo,
+                        Horas = horas,
+                        Veces = diasCompletos.Count(Salio),
+                        VecesTotal = historico.Count,
+                        UltimaFecha = ultima,
+                        DiasSinSalir = ultima != null ? (fecha - DateTime.Parse(ultima)).Days : null,
+                        Animalitos = horas.Select(h =>
+                        {
+                            var fila = filasOrigenHoy.FirstOrDefault(x => x.Hora == h);
+                            var animal = fila.Hora != null ? animalPorId.GetValueOrDefault(fila.AnimalId) : null;
+                            return new RepeticionCandidato
+                            {
+                                AnimalId = fila.AnimalId,
+                                Nombre = animal?.nombre,
+                                ImageB64 = animal?.image,
+                                HorasOrigen = h,
+                                YaSalio = animal != null && setHoy.Contains(fila.AnimalId),
+                                HoraHoy = string.Join(", ", filasHoy.Where(x => animal != null && x.AnimalId == fila.AnimalId).Select(x => x.Hora))
+                            };
+                        }).ToList()
+                    });
+                }
+
+                return new RepeticionViewModel
+                {
+                    Fecha = fechaStr,
+                    FechaOrigen = origenStr,
+                    Desfase = desfase,
+                    Ventana = ventana,
+                    TasaHistorica = Tasa(paresDesfase),
+                    TasaBase = tasaBase,
+                    DiasAnalizados = paresDesfase.Count,
+                    Candidatos = candidatos,
+                    PorHoraDestino = destino.Values.OrderBy(h => ParseTimeSafe(h.Hora)).ToList(),
+                    PorHoraOrigen = origen.Values.OrderBy(h => ParseTimeSafe(h.Hora)).ToList(),
+                    HorasSorteo = all.Select(r => r.hora).Distinct().OrderBy(ParseTimeSafe).ToList(),
+                    Patrones = patrones
+                };
+            }
+            catch
+            {
+                return new RepeticionViewModel();
+            }
+        }
+
+        // Todas las veces que salió el patrón antes de la fecha consultada, de la más reciente a la más antigua
+        public async Task<List<RepeticionHistorialFila>> GetHistorialPatronAsync(int id, string date, int desfase = 2)
+        {
+            try
+            {
+                if (desfase <= 0) desfase = 2;
+                if (!DateTime.TryParse(date, out var fecha)) fecha = DateTime.Today;
+                string fechaStr = fecha.ToString("yyyy-MM-dd");
+
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                var patron = await db.lottoActivoPatrones.AsNoTracking().FirstOrDefaultAsync(p => p.id == id);
+                if (patron == null) return new List<RepeticionHistorialFila>();
+                var horas = patron.horas.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                        .OrderBy(ParseTimeSafe).ToList();
+
+                var all = await db.lottoActivoResultados.AsNoTracking()
+                                  .Where(r => r.fecha.CompareTo(fechaStr) < 0)
+                                  .OrderBy(r => r.id)
+                                  .Select(r => new { r.fecha, r.hora, r.lottoActivoAnimalId })
+                                  .ToListAsync();
+                var animalPorId = (await db.lottoActivoAnimals.AsNoTracking().ToListAsync())
+                                  .Where(a => a.id.HasValue)
+                                  .ToDictionary(a => a.id.Value, a => a);
+                var porDia = all.GroupBy(r => r.fecha)
+                                .ToDictionary(g => g.Key, g => g.Select(r => (Hora: r.hora, AnimalId: r.lottoActivoAnimalId)).ToList());
+
+                var filas = new List<RepeticionHistorialFila>();
+                DateTime? anterior = null;
+                foreach (var dia in porDia.Keys.OrderBy(f => f))
+                {
+                    if (!DateTime.TryParse(dia, out var d)) continue;
+                    string origenStr = d.AddDays(-desfase).ToString("yyyy-MM-dd");
+                    if (!porDia.TryGetValue(origenStr, out var filasOrigen)) continue;
+                    var filasDestino = porDia[dia];
+
+                    var animalitos = horas.Select(h => filasOrigen.FirstOrDefault(x => x.Hora == h)).ToList();
+                    if (animalitos.Any(x => x.Hora == null || !filasDestino.Any(y => y.AnimalId == x.AnimalId))) continue;
+
+                    filas.Add(new RepeticionHistorialFila
+                    {
+                        FechaOrigen = origenStr,
+                        Fecha = dia,
+                        Dias = anterior.HasValue ? (d - anterior.Value).Days : null,
+                        Animalitos = animalitos.Select(x =>
+                        {
+                            var animal = animalPorId.GetValueOrDefault(x.AnimalId);
+                            return new RepeticionCandidato
+                            {
+                                AnimalId = x.AnimalId,
+                                Nombre = animal?.nombre,
+                                ImageB64 = animal?.image,
+                                HorasOrigen = x.Hora,
+                                YaSalio = true,
+                                HoraHoy = string.Join(", ", filasDestino.Where(y => y.AnimalId == x.AnimalId).Select(y => y.Hora))
+                            };
+                        }).ToList()
+                    });
+                    anterior = d;
+                }
+
+                filas.Reverse();
+                return filas;
+            }
+            catch
+            {
+                return new List<RepeticionHistorialFila>();
+            }
+        }
+
+        // Devuelve null si se creó, o el mensaje de error
+        public async Task<string> CrearPatronAsync(string codigo, List<string> horas)
+        {
+            codigo = codigo?.Trim().ToUpper();
+            if (string.IsNullOrEmpty(codigo)) return "El código es obligatorio.";
+            if (horas == null || horas.Count < 2) return "Seleccione al menos 2 horas.";
+
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                if (await db.lottoActivoPatrones.AnyAsync(p => p.codigo == codigo))
+                    return $"Ya existe un patrón con el código {codigo}.";
+
+                db.lottoActivoPatrones.Add(new LottoActivoPatron
+                {
+                    codigo = codigo,
+                    horas = string.Join(",", horas.Distinct().OrderBy(ParseTimeSafe))
+                });
+                await db.SaveChangesAsync();
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return $"HA OCURRIDO UN ERROR INTERNO: {ex.Message}";
+            }
+        }
+
+        public async Task<bool> EliminarPatronAsync(int id)
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                var patron = await db.lottoActivoPatrones.FindAsync(id);
+                if (patron == null) return false;
+                db.lottoActivoPatrones.Remove(patron);
+                await db.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
     }
 }
